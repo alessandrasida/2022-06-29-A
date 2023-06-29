@@ -53,83 +53,86 @@ public class FXMLController {
 
     @FXML
     void doCalcolaAdiacenze(ActionEvent event) {
+    	if( this.cmbA1.getValue() == null) {
+    		this.txtResult.setText("Selezionare un album.");
+    		
+    	}
+    	this.txtResult.clear();
     	Album a = this.cmbA1.getValue();
-    	if( a == null) {
-    		this.txtResult.setText("Please select an element from combo box");
-    		return;
+    	List<BilancioAlbum> risultato = this.model.getBilancioSUccessori(a);
+    	for(BilancioAlbum ba : risultato) {
+    		this.txtResult.appendText(ba + "\n");
     	}
     	
-    	List<BilancioAlbum> bilanci = model.getAdiacenti(a);
-    	this.txtResult.setText("Printing successors of node " + a + ".\n");
-    	for( BilancioAlbum b : bilanci) {
-    		this.txtResult.appendText(b + "\n");
-    	}
     }
 
     @FXML
     void doCalcolaPercorso(ActionEvent event) {
-String input = this.txtX.getText();
+    	if( this.cmbA1.getValue() == null) {
+    		this.txtResult.setText("Selezionare un album.");	
+    	}
+    	if( this.cmbA2.getValue() == null) {
+    		this.txtResult.setText("Selezionare un secondo album album.");	
+    	}
+    	this.txtResult.clear();
+    	Album inizio = this.cmbA1.getValue();
+    	Album fine = this.cmbA2.getValue();
+    	Integer x=0 ;
     	
-    	if( input == "") {
-    		this.txtResult.setText("Input String for N is empty.");
+    	try {
+    		x = Integer.parseInt(this.txtX.getText());
+    		if( x < 0) {
+    			this.txtResult.setText("Inserire un bvalore numerico maggiore di 0.");
+    			return;
+    		}
+    		
+    	}catch(NumberFormatException e) {
+    		this.txtResult.appendText("Inserire un valore numerico valido.");
     		return;
     	}
     	
-    	try {
-    		int InputNum = Integer.parseInt(input);
-    		Album source = this.cmbA1.getValue();
-    		Album target = this.cmbA2.getValue();
-    		if( source == null || target == null) {
-    			this.txtResult.setText("Please select an Album from the combo box ");
-    			return;
-
-    		}
-    		List<Album> path = model.getPath(source, target, InputNum);
-    		
-    		if( path.isEmpty()) {
-    			this.txtResult.setText("No path between " + source + " and " + target);
-    			return;
-    		}
-    		
-    		this.txtResult.setText("Printing path between " + source + " and " + target + "\n");
-    		
-    		for( Album a : path) {
-    			this.txtResult.appendText(a+ "\n");
-    		}
-    	}catch( NumberFormatException e) {
-    		this.txtResult.setText("Input string for N is not a valid number.");
+    	List<Album> result = this.model.cercaPercorso(inizio, fine, x);
+    	for( Album a : result) {
+    		this.txtResult.appendText(a + "\n");
     	}
     	
     }
 
     @FXML
     void doCreaGrafo(ActionEvent event) {
-    	this.txtResult.clear();
-    	
-    	String input = this.txtN.getText();
-    	
-    	if( input == "") {
-    		this.txtResult.setText("Input String for N is empty.");
+    	if( this.txtN.getText() == null) {
+    		this.txtResult.setText("Inserire un valore.");
+    		return;
     	}
+    	
+    	int n = 0;
     	
     	try {
-    		int InputNum = Integer.parseInt(input);
-    		this.model.buidGraph(InputNum);
-    		int numV = model.getNumVertici();
-    		int numE = model.getNumEdges();
+    		n = Integer.parseInt(this.txtN.getText());
+    		if( n < 0) {
+    			this.txtResult.setText("Inserire un bvalore numerico maggiore di 0.");
+    			return;
+    		}
     		
-    		this.txtResult.setText("Graph correctly created. \n");
-    		this.txtResult.appendText("Number vertices: " + numV + "\n");
-    		this.txtResult.appendText("Number edges: " + numE + "\n");
+    	}catch(NumberFormatException e) {
+    		this.txtResult.appendText("Inserire un valore numerico valido.");
+    		return;
     		
-    		this.cmbA1.getItems().setAll(model.getVertices());
-    		this.cmbA2.getItems().setAll(model.getVertices());
-    		
-    	}catch( NumberFormatException e) {
-    		this.txtResult.setText("Input string for N is not a valid number.");
     	}
+    	this.model.clearGrafo();
+    	this.model.creaGrafo(n);
+		this.txtResult.setText("Grafo creato.");
+		this.txtResult.appendText("\n#Vertici: " + this.model.getNVertici() );
+		this.txtResult.appendText("\n#Archi: " + this.model.getNArchi() );
+    		
+		List<Album> album = this.model.getVertici();
     	
-    	
+		for(Album a: album) {
+			this.cmbA1.getItems().add(a);
+		}
+		for(Album a: album) {
+			this.cmbA2.getItems().add(a);
+		}
     }
 
     @FXML // This method is called by the FXMLLoader when initialization is complete

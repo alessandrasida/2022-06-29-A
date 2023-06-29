@@ -2,25 +2,35 @@ package it.polito.tdp.itunes.model;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 
 import org.jgrapht.Graphs;
 import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
+import org.jgrapht.traverse.BreadthFirstIterator;
 
 import it.polito.tdp.itunes.db.ItunesDAO;
 
 public class Model {
 	
-	private List<Album> allAlbum;
-	private SimpleDirectedWeightedGraph<Album, DefaultWeightedEdge> grafo;
-	private ItunesDAO dao;
-	private int bestScore;
-	private List<Album> bestPath;
-	
+	ItunesDAO dao;
+	SimpleDirectedWeightedGraph<Album, DefaultWeightedEdge> grafo;
+	List<Album> best;
+	List<Album> album;
+	Integer x;
+	Integer bilancioMin;
 	
 	public Model() {
-		this.allAlbum = new ArrayList<>();
+		
+	dao = new ItunesDAO();
+	grafo = new SimpleDirectedWeightedGraph<>(DefaultWeightedEdge.class);
+	
+
+	
+	}
+	
+	public void clearGrafo() {
 		this.grafo = new SimpleDirectedWeightedGraph<>(DefaultWeightedEdge.class);
 		this.dao = new ItunesDAO();
 		
@@ -28,69 +38,112 @@ public class Model {
 	
 	
 	
-	public List<Album> getPath(Album souce, Album target, int minimo){
-		List<Album> parziale = new ArrayList<>();
-		this.bestPath = new ArrayList<>();
-		this.bestScore = 0;
-		parziale.add(souce);
+	public void creaGrafo(int n) {
+		List<Album> vertici = dao.getAlbumGrafo(n);
+		Graphs.addAllVertices(this.grafo, vertici);
 		
-		ricorsione( parziale, target, minimo);
-		return bestPath;
-	}
-	
-	
-	private void ricorsione(List<Album> parziale, Album target, int minimo) {
-		Album current  = parziale.get(parziale.size()-1);
 		
-		//condiz di terminazione
-		if( current.equals(target)) {
-			//controllo se è migliore di best
-			if( getScore( parziale) > this.bestScore) {
-				this.bestScore = getScore(parziale);
-				this.bestPath = new ArrayList<>(parziale);
-				return;
-			}
-		}
-		
-		//continuo ad aggiungere elementi in parziale
-		List<Album> successori = Graphs.successorListOf(this.grafo,  current);
-		
-		for( Album a : successori) {
-			if( this.grafo.getEdgeWeight(this.grafo.getEdge(current, a)) >= minimo) {
-				parziale.add(a);
-				ricorsione(parziale, target, minimo);
-				parziale.remove(a);
-			}
-		}
-		
-	}
-
-
-
-	private int getScore(List<Album> parziale) {
-		Album source = parziale.get(0);
-		int score =0;
-		for( Album a : parziale.subList(1, parziale.size()-1)) {
-			if( getBilancio(a) > getBilancio(source))
-				score += 1;
+		for( Album a : vertici) {
 			
+			for( Album a2 : vertici) {
+				if( ! a.equals(a2)) {
+					if( (a.getN() - a2.getN()) > 0 )
+						Graphs.addEdgeWithVertices(this.grafo, a2, a , a.getN()-a2.getN());
+					//if( a2.getN()-a.getN()> 0)
+					//	Graphs.addEdgeWithVertices(this.grafo, a2, a, a2.getN()-a.getN());
+					
+				}
+				
+			}
 		}
 		
-		return score;
-	}
-
-
-
-	public void buidGraph(int n) {
-		clearGraph();
-		loadNodes(n);
 		
-		Graphs.addAllVertices(this.grafo, this.allAlbum);
-		for( Album a1 : this.allAlbum) {
-			for( Album a2 : this.allAlbum) {
-				int peso = a1.getN() - a2.getN();
-				if( peso > 0) {
-					Graphs.addEdgeWithVertices(this.grafo, a2, a1, n);
+	}
+	
+	public List<BilancioAlbum> getBilancioSUccessori(Album a){
+		List<Album>  successori = Graphs.successorListOf(grafo, a);
+		List<BilancioAlbum> result = new LinkedList<>();
+		
+		for(Album album : successori) {
+			result.add(new BilancioAlbum( album, this.getBilancio(album)));
+		}
+		Collections.sort(result);
+		
+		return result;
+		
+	}
+	
+	
+	public int getBilancio( Album a) {
+		
+		int bilancio;
+		
+		List<Album> precedenti = Graphs.predecessorListOf(this.grafo, a);
+		List<Album> successori = Graphs.successorListOf(grafo, a);
+		
+		int sommaEntranti = 0;
+		if( precedenti.size()>0) {
+			for( Album a1 : precedenti) {
+				DefaultWeightedEdge e = grafo.getEdge(a1, a);
+				sommaEntranti += grafo.getEdgeWeight(e);
+				
+			}
+		}
+		
+		int sommaSuccessori = 0;
+		if( successori.size()>0) {
+			for( Album a2 : successori) {
+				DefaultWeightedEdge e = grafo.getEdge(a, a2);
+				sommaSuccessori += grafo.getEdgeWeight(e);
+			}
+		}
+		
+		
+		bilancio = sommaEntranti - sommaSuccessori;		
+		return bilancio;
+		
+	}
+	
+	
+	
+	public List<Album> cercaPercorso(Album a1, Album a2, int x) {
+		List<Album> parziale = new ArrayList<>();
+		best = new ArrayList<>();
+		this.album = new ArrayList<>(this.grafo.vertexSet());
+		this.x = x;
+		this.bilancioMin = this.getBilancio(a1);
+		parziale.add(a1);
+		ricorsione(parziale, a2);
+		
+		return best;
+	}
+	
+	
+	
+	
+	
+	
+	private void ricorsione(List<Album> parziale,  Album arrivo) {
+		
+		Album current = parziale.get(parziale.size()-1);
+		
+		//condizione di terminazione
+		if( current.equals(arrivo)) {
+			if( contoBilancio(parziale) > contoBilancio(best)) {
+				this.best = new ArrayList<>(parziale);
+			}
+		}
+		
+		
+		for( DefaultWeightedEdge e : grafo.edgeSet()) {
+			if( grafo.getEdgeSource(e).equals(current)) {
+				if( grafo.getEdgeWeight(e) >= this.x) {
+					Album target = Graphs.getOppositeVertex(grafo, e, current);
+					parziale.add(target);
+					ricorsione( parziale, arrivo);
+					//backtracking
+					parziale.remove(parziale.size()-1);
+					
 				}
 			}
 		}
@@ -98,60 +151,38 @@ public class Model {
 	}
 	
 	
-	private int getBilancio( Album a) {
-		int bilancio = 0;
-		List<DefaultWeightedEdge> edgesIn = new ArrayList<>( this.grafo.incomingEdgesOf(a));
-		List<DefaultWeightedEdge> edgesOut = new ArrayList<>( this.grafo.outgoingEdgesOf(a));
-		
-		for( DefaultWeightedEdge edge : edgesIn) {
-			bilancio += this.grafo.getEdgeWeight(edge);
-		}
-		for( DefaultWeightedEdge edge : edgesOut) {
-			bilancio -= this.grafo.getEdgeWeight(edge);
-		}
-		
-		return bilancio;
-		
-	}
 	
-	public List<BilancioAlbum> getAdiacenti( Album a){
-		List<Album> successori = Graphs.successorListOf(this.grafo, a);
-		List<BilancioAlbum> bilancioSucc = new ArrayList<>();
+	
+	
+
+	private int contoBilancio(List<Album> lista ) {
+		int n = 0;
 		
-		for( Album aa : successori) {
-			bilancioSucc.add(new BilancioAlbum( aa, this.getBilancio(aa)));
-			
+		for( Album a : lista) {
+			if( this.getBilancio(a) > this.bilancioMin) {
+				n ++;
+			}
 		}
-		Collections.sort(bilancioSucc);
-		return bilancioSucc;
-	}
-	
- 	public List<Album> getVertices(){
-		List<Album> vertici =  new ArrayList<>( this.grafo.vertexSet());
-		Collections.sort(vertici);
-		return vertici;
-		
-	}
-	
-	private void clearGraph() {
-		this.allAlbum = new ArrayList<>();
-		this.grafo = new SimpleDirectedWeightedGraph<>(DefaultWeightedEdge.class);
-		
+		return n;
 	}
 
-	private void loadNodes(int n) {
-		if( this.allAlbum.isEmpty())
-			this.allAlbum = dao.getFilteredAlbums(n);
-		
+	public List<Album> getVertici(){
+		List<Album> result = new ArrayList<>(this.grafo.vertexSet());
+		Collections.sort(result);
+		return result;
 	}
-
-	public int getNumVertici() {
+	
+	
+	public int getNVertici() {
 		return this.grafo.vertexSet().size();
 	}
-
-	public int getNumEdges() {
+	
+	
+	public int getNArchi() {
 		return this.grafo.edgeSet().size();
 	}
+	
+	
 	
 	
 	
